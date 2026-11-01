@@ -1,0 +1,8 @@
+# Generated files, dependencies, and local application data
+**/node_modules/
+**/dist/
+**/coverage/
+.venv/
+data/
+backups/
+frontend/package-lock.json

@@ -1,0 +1,35 @@
+services:
+  app:
+    build:
+      context: .
+      target: runtime
+    # Desktop 4.34+: enable Settings > Resources > Network > host networking.
+    # Shares loopback with native Ollama; no LAN bind or published ports needed.
+    network_mode: host
+    init: true
+    restart: unless-stopped
+    environment:
+      LOCAL_AI_DATABASE: /app/data/personal-ai.sqlite3
+      LOCAL_AI_OLLAMA_URL: http://127.0.0.1:11434
+      LOCAL_AI_TIMEZONE: ${LOCAL_AI_TIMEZONE:-Europe/Helsinki}
+      LOCAL_AI_MODEL: ${LOCAL_AI_MODEL:-qwen3:4b}
+      LOCAL_AI_EMBEDDING_MODEL: ${LOCAL_AI_EMBEDDING_MODEL:-nomic-embed-text}
+      LOCAL_AI_MEMORY_LIMIT: ${LOCAL_AI_MEMORY_LIMIT:-8}
+      LOCAL_AI_MEMORY_TOKENS: ${LOCAL_AI_MEMORY_TOKENS:-1200}
+      LOCAL_AI_EXTRACTION_ENABLED: ${LOCAL_AI_EXTRACTION_ENABLED:-true}
+      LOCAL_AI_IMPLICIT_SUGGESTIONS: ${LOCAL_AI_IMPLICIT_SUGGESTIONS:-true}
+      LOCAL_AI_SENSITIVE_RETRIEVAL: ${LOCAL_AI_SENSITIVE_RETRIEVAL:-false}
+      LOCAL_AI_EXTRACTION_TIMEOUT: ${LOCAL_AI_EXTRACTION_TIMEOUT:-90}
+      LOCAL_AI_EMBEDDING_TIMEOUT: ${LOCAL_AI_EMBEDDING_TIMEOUT:-15}
+    volumes:
+      - still-data:/app/data
+    read_only: true
+    tmpfs:
+      - /tmp:mode=1777,size=64m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  still-data:
