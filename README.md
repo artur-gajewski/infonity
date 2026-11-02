@@ -1,5 +1,7 @@
 # Infonity
 
+[![Tests](https://github.com/artur-gajewski/infonity/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/artur-gajewski/infonity/actions/workflows/tests.yml)
+
 Infonity is a local personal assistant with persistent, evolving memory: a **memory-augmented LLM** that combines retrieval-augmented generation (RAG) with long-term memory management. It manages Documents, Todo, Reminders, Links, and personal facts through plain English.
 
 React and FastAPI provide the interface and API. Native Ollama interprets requests and generates replies; SQLite stores knowledge independently of the model. FTS5, structured matching, and sqlite-vec support hybrid retrieval. Runtime inference uses local models.
@@ -179,6 +181,8 @@ For development, run `./scripts/dev.sh` and open http://127.0.0.1:5173. Vite pro
 Copy/edit `.env.example` for native settings. Saved model/retrieval Settings take precedence over environment values for editable fields on subsequent starts. Docker forwards the variables listed in `compose.yaml`.
 
 ## Verification
+
+GitHub Actions runs storage, backend, and frontend tests plus the production frontend build on every push and pull request. Actual-model Ollama tests remain opt-in and are skipped in CI. The badge above shows the latest test workflow result on `main`.
 
 Latest frontend verification on **2026-10-30**: **66 tests across 7 files passed**, and the TypeScript/Vite production build passed after the component refactor. Earlier backend, storage, and selected real-Ollama results are recorded separately in [verification details](docs/verification.md); those checks were not rerun for the frontend refactor. No real-browser visual audit was run.
 
