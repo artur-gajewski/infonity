@@ -249,3 +249,7 @@ Storage is plaintext local SQLite. Use OS disk encryption and account controls. 
 - `scripts/` — setup, startup, checks, and backup.
 
 [Architecture](docs/architecture.md) · [API](docs/api.md) · [Memory lifecycle](docs/memory-lifecycle.md) · [Verification and limits](docs/verification.md)
+
+## License
+
+Infonity is licensed under the [GNU Affero General Public License, version 3 (AGPL-3.0)](LICENSE).
