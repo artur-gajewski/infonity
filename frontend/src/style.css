@@ -1203,8 +1203,14 @@ textarea {
 }
 
 .modal.document-modal {
-  width: 90%;
+  width: 50%;
   max-width: none;
+}
+
+@media (max-width: 700px) {
+  .modal.document-modal {
+    width: 100%;
+  }
 }
 
 .modal.document-view-modal,
@@ -1243,4 +1249,83 @@ textarea {
 }
 .external-link:hover {
   color: var(--fg);
+}
+
+/* Model responses are Markdown; user messages retain their original whitespace. */
+.markdown-text {
+  white-space: normal;
+}
+.markdown-text > :first-child {
+  margin-top: 0;
+}
+.markdown-text > :last-child {
+  margin-bottom: 0;
+}
+.markdown-text p,
+.markdown-text ul,
+.markdown-text ol,
+.markdown-text pre,
+.markdown-text blockquote {
+  margin: 0.65em 0;
+}
+.markdown-text h1,
+.markdown-text h2,
+.markdown-text h3,
+.markdown-text h4,
+.markdown-text h5,
+.markdown-text h6 {
+  line-height: 1.4;
+  margin: 1em 0 0.4em;
+  font-size: 1.15em;
+}
+.markdown-text h1 {
+  font-size: 1.4em;
+}
+.markdown-text h2 {
+  font-size: 1.25em;
+}
+.markdown-text ul,
+.markdown-text ol {
+  padding-left: 1.6em;
+}
+.markdown-text blockquote {
+  border-left: 3px solid var(--border);
+  padding-left: 1em;
+  color: var(--muted);
+}
+.markdown-text code {
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 0.9em;
+  background: var(--accent-soft);
+  border-radius: 4px;
+  padding: 0.15em 0.3em;
+}
+.markdown-text pre {
+  overflow-x: auto;
+  white-space: pre;
+  padding: 1em;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.markdown-text pre code {
+  background: none;
+  padding: 0;
+}
+.markdown-table {
+  max-width: 100%;
+  overflow-x: auto;
+}
+.markdown-text table {
+  border-collapse: collapse;
+  width: 100%;
+}
+.markdown-text th,
+.markdown-text td {
+  border: 1px solid var(--border);
+  padding: 0.4em 0.7em;
+  text-align: left;
+}
+.markdown-text hr {
+  border: 0;
+  border-top: 1px solid var(--border);
 }

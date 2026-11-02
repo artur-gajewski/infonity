@@ -32,13 +32,15 @@ export default function Sidebar({
         {[
           ["chat", "◌", "New conversation"],
           ["memories", "▧", "Memory library"],
+          ["create-document", "+", "Create document"],
+          ["upload", "↑", "Upload file"],
           ["settings", "⚙", "Settings"],
         ].map(([id, icon, label]) => (
           <button
             key={id}
             aria-current={view === id ? "page" : undefined}
             className={view === id ? "selected" : ""}
-            disabled={id === "chat" && busy}
+            disabled={(id === "chat" || id === "create-document") && busy}
             onClick={() => {
               if (id === "chat") {
                 newChat();

@@ -905,3 +905,69 @@ async def test_docker_port_origin_is_accepted(client, origin):
     response = await c.post("/api/chat", json={"message": "Hello"}, headers={"Origin": origin})
     assert response.status_code == 200
     assert any(event["type"] == "done" for event in events(response))
+
+
+async def test_upload_document_retrieval_and_deletion(client):
+    c, app, p = client
+    content = ("Project context and background details. " * 70) + "The orbital launch codeword is marigold."
+    response = await c.post("/api/documents/upload", params={"filename": "readme.md"}, content=content.encode())
+    assert response.status_code == 201
+    result = response.json()
+    assert result["saved"] > 1
+    sections = [app.state.memory.get(ident) for ident in result["ids"]]
+    assert all(s["category"] == "documents" and s["title"].startswith("readme.md (part") for s in sections)
+    assert " ".join(s["value"] for s in sections) == content
+    found, _ = await app.state.retrieval.search("marigold")
+    assert any("marigold" in s["value"] for s in found)
+    with app.state.db.connect() as conn:
+        assert conn.execute("SELECT COUNT(*) FROM memory_outbox").fetchone()[0] >= result["saved"]
+    for ident in result["ids"]:
+        assert (await c.delete(f"/api/memories/{ident}")).status_code == 200
+    found, _ = await app.state.retrieval.search("marigold")
+    assert not found
+
+
+@pytest.mark.parametrize("filename,content", [
+    ("bad.exe", b"data"), ("empty.txt", b" "), ("bad.txt", b"\xff"),
+    ("bad.pdf", b"not a pdf"), ("empty.md", b""),
+])
+async def test_upload_invalid_document(client, filename, content):
+    c, app, _ = client
+    response = await c.post("/api/documents/upload", params={"filename": filename}, content=content)
+    assert response.status_code == 422
+    assert not app.state.memory.list()
+
+
+async def test_upload_atomic_secret_rejection_and_limits(client):
+    c, app, _ = client
+    response = await c.post("/api/documents/upload", params={"filename": "context.txt"},
+                            content=("normal context " * 200 + "api_key=example").encode())
+    assert response.status_code == 422
+    assert not app.state.memory.list()
+    response = await c.post("/api/documents/upload", params={"filename": "huge.txt"}, content=b"x" * (8 * 1024 * 1024 + 1))
+    assert response.status_code == 413
+    response = await c.post("/api/documents/upload", params={"filename": "long.txt"}, content=b"x" * 500001)
+    assert response.status_code == 422
+
+
+async def test_upload_pdf_text_and_scan(client):
+    from io import BytesIO
+    from pypdf import PdfWriter
+    from pypdf.generic import DecodedStreamObject, NameObject, DictionaryObject
+    c, app, _ = client
+    writer = PdfWriter()
+    page = writer.add_blank_page(width=300, height=300)
+    empty = BytesIO()
+    writer.write(empty)
+    response = await c.post("/api/documents/upload", params={"filename": "scan.pdf"}, content=empty.getvalue())
+    assert response.status_code == 422
+    font = DictionaryObject({NameObject("/Type"): NameObject("/Font"), NameObject("/Subtype"): NameObject("/Type1"), NameObject("/BaseFont"): NameObject("/Helvetica")})
+    page[NameObject("/Resources")] = DictionaryObject({NameObject("/Font"): DictionaryObject({NameObject("/F1"): writer._add_object(font)})})
+    stream = DecodedStreamObject()
+    stream.set_data(b"BT /F1 12 Tf 10 100 Td (The project codename is Orchid.) Tj ET")
+    page[NameObject("/Contents")] = writer._add_object(stream)
+    pdf = BytesIO()
+    writer.write(pdf)
+    response = await c.post("/api/documents/upload", params={"filename": "context.PDF"}, content=pdf.getvalue())
+    assert response.status_code == 201
+    assert "Orchid" in app.state.memory.get(response.json()["ids"][0])["value"]

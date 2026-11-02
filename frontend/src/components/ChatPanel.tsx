@@ -1,6 +1,7 @@
 import React, { type FormEvent, type RefObject } from "react";
 import { flushSync } from "react-dom";
 import type { Memory, Message } from "../api";
+import MarkdownText from "./MarkdownText";
 import LinkifiedText from "../LinkifiedText";
 import { documentTitle } from "../ui";
 
@@ -52,33 +53,42 @@ export default function ChatPanel({
             (memory) => memory.category === "documents",
           ) || []
         : [];
-    return content.split("\n").map((line, index) => {
+    if (message.role === "user") return <LinkifiedText text={content} />;
+    const parts: React.ReactNode[] = [];
+    let lines: string[] = [];
+    function flushText() {
+      if (lines.length) {
+        parts.push(<MarkdownText key={parts.length} text={lines.join("\n")} />);
+        lines = [];
+      }
+    }
+    for (const line of content.split("\n")) {
       const document = documents.find(
         (document) => line === `• ${documentTitle(document)}`,
       );
-      return (
-        <React.Fragment key={index}>
-          {index > 0 && "\n"}
-          {document ? (
-            <>
-              •{" "}
-              <a
-                className="document-link"
-                href={`#document/${document.id}`}
-                onClick={(event) => {
-                  event.preventDefault();
-                  void openDocument(document.id);
-                }}
-              >
-                {documentTitle(document)}
-              </a>
-            </>
-          ) : (
-            <LinkifiedText text={line} />
-          )}
-        </React.Fragment>
+      if (!document) {
+        lines.push(line);
+        continue;
+      }
+      flushText();
+      parts.push(
+        <div key={parts.length}>
+          •{" "}
+          <a
+            className="document-link"
+            href={`#document/${document.id}`}
+            onClick={(event) => {
+              event.preventDefault();
+              void openDocument(document.id);
+            }}
+          >
+            {documentTitle(document)}
+          </a>
+        </div>,
       );
-    });
+    }
+    flushText();
+    return parts;
   }
 
   return (

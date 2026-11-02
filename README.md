@@ -98,7 +98,7 @@ Deletion requests show the selected items before execution. **Confirm** deletes 
 
 Document creation from chat opens a dialog with separate Title and Body fields. Review the draft and choose **Create document** to save; Cancel or Escape discards the unsaved draft. The creation dialog requires both fields. Document titles in chat lists and the library open the full stored body; **Edit memory** opens the version-preserving editor. The API and editor also support a titled document with an empty body. Saved URLs are clickable in chat and the library.
 
-Reminders are stored notes with their date/time text. **Scheduled notifications are not implemented.** Documents store text or references, not uploaded document files. The single-line message input remains visible while the conversation scrolls; multiline content can be edited in the library or supplied through the API/JSON import.
+Reminders are stored notes with their date/time text. **Scheduled notifications are not implemented.** Use **Upload file** below Settings in the sidebar to save PDF, TXT, and Markdown (`.md`) contents into document memories. Files are processed locally into searchable sections labeled with the filename. Ask about their contents in a later conversation; keyword retrieval is immediate and semantic vector indexing runs in the background using Ollama. The library shows each section under Documents, where it can be viewed, edited, or deleted. Limits: 8 MiB per file, 500,000 extracted characters, and 500 PDF pages. TXT/Markdown must be UTF-8; PDFs must be unencrypted and contain embedded text (scanned PDFs need OCR first). Original file bytes are not retained. Existing secret-content validation applies to uploads; a rejected section rolls back the entire upload. The single-line message input remains visible while the conversation scrolls; multiline content can be edited in the library or supplied through the API/JSON import.
 
 ## Conversations and personal memory
 
@@ -143,6 +143,7 @@ The initial dependency/model download requires internet. Set `LOCAL_AI_SPEECH_MO
 - Memory details below a reply identify records supplied to the response path. They do not prove that the model causally used every record. Replies omit raw memory IDs.
 - The sidebar lists the ten most recent discussions; older history remains stored. Settings → Recent conversations → **Delete recent conversations** asks for confirmation and deletes all discussions, including older ones, while keeping saved memories.
 - **Stop** or Escape stops an active chat request. When idle, Escape clears the message draft. Open dialogs handle Escape through their own cancel/close behavior.
+- Assistant replies render Markdown, including bold, lists, tables, and code blocks. External links open safely in a new tab; embedded HTML and remote images are disabled.
 - Dark is the default theme. The header switch saves the selected theme in this browser. The UI shows a spinner while awaiting a reply and hides model thinking content.
 
 Settings includes local model selection, extraction/retrieval controls, sensitive-context opt-in, active-memory JSON export/import, vector rebuilding, and topic/all-memory deletion. Disabling extraction does not disable explicit category actions.

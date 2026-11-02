@@ -9,6 +9,7 @@ from fastapi.responses import StreamingResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, Field, StrictBool
+from .documents import extract_document, MAX_UPLOAD
 from .speech import SpeechService
 from starlette.concurrency import run_in_threadpool
 from .config import Settings
@@ -299,6 +300,23 @@ def create_app(settings=None, provider=None):
     @app.post("/api/memories", status_code=201)
     def create_memory(body: Memory, confirm_sensitive: bool = False):
         return {"data": memory.create(body, approved=confirm_sensitive)}
+
+    @app.post("/api/documents/upload", status_code=201)
+    async def upload_document(request: Request, filename: str):
+        start_epoch = epoch()
+        content = bytearray()
+        async for block in request.stream():
+            if len(content) + len(block) > MAX_UPLOAD:
+                return JSONResponse({"error": {"message": "File exceeds 8 MiB"}}, 413)
+            content.extend(block)
+        sections = await run_in_threadpool(extract_document, filename, bytes(content))
+        async with privacy_lock:
+            if epoch() != start_epoch:
+                raise Conflict("Memory privacy settings changed during upload; please upload again")
+            with db.connect() as conn:
+                conn.execute("BEGIN IMMEDIATE")
+                ids = [memory._save(conn, section, "explicit") for section in sections]
+        return {"saved": len(ids), "ids": ids}
 
     @app.post("/api/memories/forget")
     async def forget(body: ForgetRequest):

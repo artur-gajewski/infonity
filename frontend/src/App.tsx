@@ -1,3 +1,4 @@
+import FileUpload from "./components/FileUpload";
 import AppHeader from "./components/AppHeader";
 import DocumentViewer from "./components/DocumentViewer";
 import ConfirmationDialog from "./components/ConfirmationDialog";
@@ -452,6 +453,7 @@ export default function App() {
     chat: "Conversation",
     memories: "Memory library",
     settings: "Settings",
+    upload: "Upload file",
   };
   return (
     <div className="shell">
@@ -463,6 +465,11 @@ export default function App() {
         connected={!!health?.ollama_available}
         newChat={newChat}
         navigate={(id) => {
+          if (id === "create-document") {
+            setDocumentError("");
+            setDocumentDraft({ title: "", body: "" });
+            return;
+          }
           setView(id);
           if (id === "memories") setCategory("");
         }}
@@ -639,6 +646,7 @@ export default function App() {
               </div>
             </>
           )}
+          {view === "upload" && <FileUpload />}
           {view === "settings" && settings && (
             <div className="settings-grid">
               <div>

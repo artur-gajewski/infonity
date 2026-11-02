@@ -86,9 +86,9 @@ Generation requests thinking disabled and ignores Ollama's separate thinking fie
 
 The browser uses same-origin fetch and SSE for POST chat. The UI shows a spinner while awaiting the final reply and displays errors in chat rather than an empty assistant placeholder. FastAPI serves production assets; Vite provides the development proxy.
 
-Both themes use a neutral gray palette. Dark is default. Browser localStorage holds the theme (`still-theme`), learned voice key (`sheldon-voice-key`), and voice auto-send preference (`sheldon-voice-auto-send`). Personal records are fetched from the API rather than stored in localStorage/IndexedDB. React escapes displayed text. API responses use `Cache-Control: no-store`.
+Both themes use a neutral gray palette. Dark is default. Browser localStorage holds the theme (`still-theme`), learned voice key (`sheldon-voice-key`), and voice auto-send preference (`sheldon-voice-auto-send`). Personal records are fetched from the API rather than stored in localStorage/IndexedDB. Assistant replies use react-markdown with GitHub-style Markdown, with raw HTML skipped, remote images rendered as alt text, and external links restricted to HTTP(S). User messages and stored content remain escaped text. Document-list links retain application-controlled navigation. API responses use `Cache-Control: no-store`.
 
-Each view has a single page title in the top bar. Navigation contains New conversation, Memory library, Settings, and the ten most recent discussions. Category filtering is inside the library. The composer is a single-line input with Enter to send. A viewport-sized flex layout keeps it visible while only the conversation pane scrolls; library/settings views scroll within their own workspace. Visual-viewport resizing adjusts the app height when a mobile keyboard changes the available space. General UI text is `1.125rem`, with the restored larger Infonity wordmark and `1em` past-conversation links. The favicon uses the circular I mark.
+Each view has a single page title in the top bar. Navigation contains New conversation, Memory library, Settings, Upload file, and the ten most recent discussions. Category filtering is inside the library. The composer is a single-line input with Enter to send. A viewport-sized flex layout keeps it visible while only the conversation pane scrolls; library/settings views scroll within their own workspace. Visual-viewport resizing adjusts the app height when a mobile keyboard changes the available space. General UI text is `1.125rem`, with the restored larger Infonity wordmark and `1em` past-conversation links. The favicon uses the circular I mark.
 
 ## Frontend components and ownership
 
@@ -121,3 +121,14 @@ The composer supports Stop or Escape to abort an active request and Escape to cl
 `dictation.ts` inserts recognized text at the selected text field's cursor, replacing its selection and restoring focus. `App.tsx` routes dictation to eligible text inputs and textareas, including modal fields, with a chat-composer fallback when no modal is open. Disabled, read-only, password, and non-text controls are excluded. Auto-send defaults to off; enabling it sends the full chat draft after transcription finishes, but never submits other forms.
 
 The API serializes transcription and runs `SpeechService` in a thread pool. faster-whisper loads a local `small.en` model lazily on CPU with int8 computation, four threads, English decoding, five-candidate beam search, and voice-activity filtering. Audio is decoded in memory and is not saved. Docker downloads the model at build time and runs with offline model loading. Speech recognition is independent of Ollama.
+
+## Uploaded document context
+
+The raw-byte document upload endpoint extracts PDF text locally with pypdf, or
+decodes UTF-8 TXT/Markdown. Bounded extraction produces sections of at most 1,600
+characters so individual sections fit typical response memory budgets. Sections
+are ordinary Documents memories with filename/part titles, saved in one transaction
+through the memory service under the privacy lock after an epoch recheck. No new
+database or schema is needed: existing FTS triggers, embedding outbox, sqlite-vec,
+hybrid retrieval, versioning and deletion apply to every section. Original binary
+files are not stored. Embedded instructions remain untrusted memory context.

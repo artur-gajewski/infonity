@@ -170,3 +170,19 @@ Timezone is configured by `LOCAL_AI_TIMEZONE`, not the Settings PATCH schema. Do
 ## Local speech input
 
 `POST /api/speech/transcribe` accepts raw audio with Content-Type `audio/mp4`, `audio/webm`, `audio/ogg`, `audio/wav`, or `audio/x-wav` (codec parameters permitted). Returns `{ "text": "..." }` without sending a chat message. Maximum upload: 8 MiB; maximum decoded duration: 65 seconds (UI stops at 60 seconds). Empty or undecodable audio returns 422, unsupported media 415, oversize input 413, concurrent transcription 429, unavailable local model/dependencies 503. Audio is processed in memory and not persisted.
+
+## File uploads
+
+`POST /api/documents/upload?filename=readme.md` accepts raw file bytes with
+`Content-Type: application/octet-stream`. Supported suffixes: `.pdf`, `.txt`, `.md`
+(case insensitive). Maximum 8 MiB, 500,000 extracted characters, 500 PDF pages.
+Text must be UTF-8; PDFs must be unencrypted with embedded text. Scans need OCR.
+Returns HTTP 201 with `{"saved": 2, "ids": ["...", "..."]}`. Oversize uploads
+return 413; invalid, empty, unsupported or unreadable input returns 422.
+
+Text is split into bounded document memories titled with filename and part number.
+All sections save atomically through existing memory validation; secret detection
+rejects the entire upload. Original bytes are discarded. Each section has the
+normal editing, history, export, deletion, FTS and embedding-outbox behavior.
+Semantic indexing runs in the background; lexical retrieval is immediate.
+A privacy epoch change during extraction rejects the save with 409.
