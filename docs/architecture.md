@@ -29,7 +29,7 @@ flowchart TD
 
 The prompt uses labelled context rather than a JSON input object to reduce context echoing in JSON mode. Current items receive request-local handles such as `item_1`. The backend maps exact handles to database IDs and checks state/version before targeted mutations. It never approximates a mistyped UUID.
 
-`actions.py` dispatches to the same memory service used by REST endpoints. Category actions return application-written results based on actual execution. The model chooses intent and arguments; it does not generate arbitrary HTTP calls or executable code. Exact legacy add/forget grammar remains a fallback when interpretation selects ordinary chat.
+`actions.py` dispatches to the same memory service used by REST endpoints. Category actions return application-written results based on actual execution. The model chooses intent and arguments; it does not generate arbitrary HTTP calls or executable code. Exact legacy add/forget grammar remains a fallback when interpretation selects ordinary chat. Document-list actions additionally require an explicit collection-listing request in the latest message; misclassified content questions fall back to ordinary retrieval and answering, even after document edits.
 
 A deletion action proposes a persisted selection. It does not execute removal. The confirmation endpoint validates the pending token, expiry, privacy epoch, and target versions under the application privacy lock and a SQLite write transaction. Cancellation consumes the request without deleting records. Confirmation operates on the captured IDs, not a newly expanded category query.
 

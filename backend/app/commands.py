@@ -56,3 +56,21 @@ def requests_document_creation(text: str) -> bool:
         r"[^\n:]*?\b(?:documents?|docs?|notes?)\b",
         text, re.I,
     ) or re.fullmatch(r"\s*(?:a\s+)?new\s+document\s*[.!]?\s*", text, re.I))
+
+
+def requests_document_listing(text: str) -> bool:
+    """Only explicit collection requests may replace an answer with document titles."""
+    prefix = (
+        r"\s*(?:please\s+)?(?:(?:can|could|would|will)\s+you\s+)?"
+        r"(?:please\s+)?"
+    )
+    collection = r"(?:(?:all(?:\s+of)?|my|the|saved|uploaded)\s+)*(?:documents|docs|files)\b"
+    return bool(re.fullmatch(
+        prefix + r"(?:list|show|display)\s+(?:me\s+)?(?:a\s+list\s+of\s+)?"
+        + collection + r"(?:\s+(?:about|containing|named|with|for)\s+[^\n]+)?\s*[?.!]?\s*",
+        text, re.I,
+    ) or re.fullmatch(
+        prefix + r"(?:what|which)\s+" + collection
+        + r"\s+(?:do\s+I\s+have|have\s+I\s+(?:saved|uploaded))\s*[?.!]?\s*",
+        text, re.I,
+    ))

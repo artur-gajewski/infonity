@@ -13,7 +13,7 @@ from .documents import extract_document, MAX_UPLOAD
 from .speech import SpeechService
 from starlette.concurrency import run_in_threadpool
 from .config import Settings
-from .commands import parse_forget, parse_add, parse_fact_request, requests_document_creation
+from .commands import parse_forget, parse_add, parse_fact_request, requests_document_creation, requests_document_listing
 from .db import Database
 from .provider import Ollama
 from .models import Memory, MemoryEdit, ChatRequest, ForgetRequest, Intent
@@ -464,6 +464,10 @@ def create_app(settings=None, provider=None):
                 # misclassify ordinary personal facts as document additions.
                 if (plan.action == "add" and plan.category == "documents"
                         and not requests_document_creation(body.message)):
+                    plan = Intent(action="chat")
+                # A model-selected list must not swallow a question about file contents.
+                if (plan.action == "list" and plan.category == "documents"
+                        and not requests_document_listing(body.message)):
                     plan = Intent(action="chat")
                 plan.target_ids = [handles.get(ident, ident) for ident in plan.target_ids]
                 if plan.action != "chat":

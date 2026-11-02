@@ -971,3 +971,28 @@ async def test_upload_pdf_text_and_scan(client):
     response = await c.post("/api/documents/upload", params={"filename": "context.PDF"}, content=pdf.getvalue())
     assert response.status_code == 201
     assert "Orchid" in app.state.memory.get(response.json()["ids"][0])["value"]
+
+
+@pytest.mark.parametrize("question", [
+    "Who should i contact at nitor if i'm sick?",
+    "What does my sick leave document say about contacts?",
+    "List the contacts in my uploaded document",
+    "Show me what the document says about sick leave",
+    "Summarize my sick leave PDF",
+])
+async def test_misclassified_document_question_uses_answer_path_after_edit(client, question):
+    from app.models import Intent
+    c, app, p = client
+    saved = app.state.memory.create(Memory(category="documents", title="Sick leave.pdf (part 1/2)", predicate="item", value="For sick leave contact People Operations at ops@example.com."))
+    p.intent = Intent(action="update", category="documents", target_ids=[saved["id"]], content="For sick leave contact People Operations at updated@example.com.")
+    prior = events(await c.post("/api/chat", json={"message": "Update the document to: For sick leave contact People Operations at updated@example.com."}))
+    conversation_id = prior[0]["id"]
+    assert any("Updated in Documents" in e.get("text", "") for e in prior)
+    p.intent = Intent(action="list", category="documents")
+    result = events(await c.post("/api/chat", json={"message": question, "conversation_id": conversation_id}))
+    answer = "".join(e["text"] for e in result if e["type"] == "delta")
+    assert answer == "A local answer."
+    assert p.prompts
+    assert "updated@example.com" in json.dumps(p.prompts[-1])
+    assert "ops@example.com" not in json.dumps(p.prompts[-1])
+    assert not any(e["type"] == "error" for e in result)

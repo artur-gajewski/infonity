@@ -66,3 +66,28 @@ def test_document_creation_requires_a_request(message):
 def test_statements_and_explanations_do_not_request_documents(message):
     from app.commands import requests_document_creation
     assert not requests_document_creation(message)
+
+
+@pytest.mark.parametrize("message", [
+    "List my documents", "Show documents", "Could you please show me my uploaded files?",
+    "List all of my saved documents", "Show documents about sick leave",
+    "Which documents do I have?", "What files have I uploaded?",
+    "Please display a list of my docs",
+])
+def test_explicit_document_listing(message):
+    from app.commands import requests_document_listing
+    assert requests_document_listing(message)
+
+
+@pytest.mark.parametrize("message", [
+    "Who should i contact at nitor if i'm sick?",
+    "What does my document say about sick leave?",
+    "Show me what the document says about sick leave",
+    "List the contacts in my uploaded document",
+    "Summarize my uploaded PDF", "Explain how to list my documents",
+    "Don't list my documents", 'My note says "list my documents"',
+    "Show me the email address from my documents",
+])
+def test_document_content_requests_are_not_collection_lists(message):
+    from app.commands import requests_document_listing
+    assert not requests_document_listing(message)
