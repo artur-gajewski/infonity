@@ -4,7 +4,7 @@ Infonity is a local personal assistant with persistent, evolving memory: a **mem
 
 React and FastAPI provide the interface and API. Native Ollama interprets requests and generates replies; SQLite stores knowledge independently of the model. FTS5, structured matching, and sqlite-vec support hybrid retrieval. Runtime inference uses local models.
 
-<img width="1036" height="818" alt="Screenshot 2026-10-30 at 13 01 08" src="https://github.com/user-attachments/assets/8df73205-8375-4490-986d-1e4f10063636" />
+<img width="1211" height="819" alt="Screenshot 2026-11-01 at 10 43 54" src="https://github.com/user-attachments/assets/c99f92f6-f629-4899-ad69-0fd6275cea81" />
 
 ## RAG with long-term memory
 
