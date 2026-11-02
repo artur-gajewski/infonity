@@ -131,6 +131,8 @@ Docker installs the speech dependencies and downloads the model during the build
 
 The initial dependency/model download requires internet. Set `LOCAL_AI_SPEECH_MODEL` to an existing local model directory to override the default. Speech transcription is independent of Ollama.
 
+### How to chat
+
 - Ordinary questions use the model’s general knowledge, even without relevant saved memories.
 - Calendar questions receive the current local clock and the next seven dates. `LOCAL_AI_TIMEZONE` defaults to `Europe/Helsinki`.
 - Durable personal facts such as “I like pizza” are extracted, checked against the user’s source, and saved automatically in the background after a successful reply. Newly mentioned facts may take time to appear; pending extraction is cancelled at shutdown and is not replayed. There is no Suggestions section or approval step in the normal UI.
