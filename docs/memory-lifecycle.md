@@ -6,12 +6,18 @@ The normal application has no Suggestions section. With the default automatic-sa
 
 1. Persist the user message before inference.
 2. Interpret category actions separately from ordinary chat. Explicit saves go through validated action execution.
-3. On ordinary chat, the versioned extraction prompt analyses the latest user message with recent context. Assistant claims alone cannot establish personal facts.
+3. After an ordinary reply completes, background extraction analyses the latest user message with recent context using the versioned extraction prompt. Explicit `remember` requests wait for extraction before replying. Assistant claims alone cannot establish personal facts.
 4. Validate output and verify proposed facts against the user's source with a second local model request. Evidence must be an exact source span and contain the proposed value.
 5. Skip unsupported, secret-like, or ambiguous extracted claims. Save verified unambiguous facts automatically, including inferred preferences.
 6. Recheck source exclusion before committing. Deletion during inference wins.
 
-Personal-memory extraction can be disabled independently of explicit category actions. Extraction/verification failures do not save that extraction and ordinary chat can continue with a warning.
+Personal-memory extraction can be disabled independently of explicit category actions.
+Extraction/verification failures do not save that extraction. Explicit saves can
+report a warning; automatic extraction runs after the reply stream and cannot send
+a completion or failure event to that stream. The reply announces pending automatic
+saving, not a confirmed save. Background tasks are serialized and cancelled on
+shutdown, without replay after restart. A newly mentioned fact may therefore take
+time to appear in the library or be available to the next reply.
 
 Sensitive extracted facts can be saved automatically. They remain excluded from model retrieval unless `sensitive_retrieval` is enabled in Settings. Secret detection is heuristic, not a comprehensive credential detector. Direct low-level API creation of a sensitive record still requires `confirm_sensitive=true`.
 

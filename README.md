@@ -10,16 +10,16 @@ React and FastAPI provide the interface and API. Native Ollama interprets reques
 
 Traditional RAG retrieves information from a supplied knowledge base, often documents. Infonity also builds and maintains personal knowledge through conversations: it extracts facts, verifies them against the user's words, stores them, and preserves corrections over time.
 
-| Capability                               | Traditional RAG alone                   | Infonity                                                             |
-| ---------------------------------------- | --------------------------------------- | -------------------------------------------------------------------- |
-| Retrieve relevant information            | Yes                                     | Yes                                                                  |
-| Vector embeddings and semantic search    | Common                                  | Yes, alongside keyword and structured search                         |
-| Build knowledge from conversations       | Requires additional memory management   | Automatically extracts and verifies personal facts                   |
-| Remember personal facts across sessions  | Depends on supplied sources             | Persistent SQLite memories                                           |
-| Handle conflicting facts and corrections | Requires additional memory management   | Can supersede conflicting personal claims and preserve versions      |
-| Forget information                       | Usually by removing sources and indexes | Explicit deletion with confirmation in chat and the UI               |
-| Track memory history                     | Depends on the source system            | Version history and provenance                                       |
-| Automatically save memories              | Requires additional memory management   | Supported facts are saved automatically; no suggestion approval step |
+| Capability | Traditional RAG alone | Infonity |
+| --- | --- | --- |
+| Retrieve relevant information | Yes | Yes |
+| Vector embeddings and semantic search | Common | Yes, alongside keyword and structured search |
+| Build knowledge from conversations | Requires additional memory management | Automatically extracts and verifies personal facts |
+| Remember personal facts across sessions | Depends on supplied sources | Persistent SQLite memories |
+| Handle conflicting facts and corrections | Requires additional memory management | Can supersede conflicting personal claims and preserve versions |
+| Forget information | Usually by removing sources and indexes | Explicit deletion with confirmation in chat and the UI |
+| Track memory history | Depends on the source system | Version history and provenance |
+| Automatically save memories | Requires additional memory management | Supported facts are saved automatically; no suggestion approval step |
 
 Memory formation and memory recall are separate processes:
 
@@ -70,23 +70,23 @@ Open **http://127.0.0.1:18473**. Docker serves both the UI and API; no host Pyth
 
 The local LLM selects a structured action. The backend validates its fields and target, executes the corresponding application service, and reports the result. The model cannot call arbitrary endpoints or execute code.
 
-| Request                                                 | Result                                                              |
-| ------------------------------------------------------- | ------------------------------------------------------------------- |
-| Add todo buy groceries                                  | Save a Todo item                                                    |
+| Request | Result |
+| --- | --- |
+| Add todo buy groceries | Save a Todo item |
 | Save these notes in documents: Meeting moved to Tuesday | Open a prefilled document dialog; review and choose Create document |
-| Keep https://example.com in my links                    | Save a link                                                         |
-| Give that link the title Example                        | Change its title while preserving its URL                           |
-| Remind me to call the dentist on Friday                 | Save a reminder note                                                |
-| Show links for my favorite foods                        | Filter saved links                                                  |
-| Show links containing www                               | Filter link content                                                 |
-| Show me links for programming                           | List links; conversational testing language is not a search filter  |
-| Change the milk task to buy oat milk                    | Edit task content                                                   |
-| Mark groceries as in progress                           | Change task status, keeping its name                                |
-| Set meeting as unsure                                   | Save the custom status `unsure`                                     |
-| Update groceries as waiting for delivery                | Save another custom status                                          |
-| Show todos with status blocked                          | Filter by status                                                    |
-| Remove the dentist reminder                             | Ask for deletion confirmation                                       |
-| Erase all my todos                                      | Ask to confirm the selected Todo items                              |
+| Keep https://example.com in my links | Save a link |
+| Give that link the title Example | Change its title while preserving its URL |
+| Remind me to call the dentist on Friday | Save a reminder note |
+| Show links for my favorite foods | Filter saved links |
+| Show links containing www | Filter link content |
+| Show me links for programming | List links; conversational testing language is not a search filter |
+| Change the milk task to buy oat milk | Edit task content |
+| Mark groceries as in progress | Change task status, keeping its name |
+| Set meeting as unsure | Save the custom status `unsure` |
+| Update groceries as waiting for delivery | Save another custom status |
+| Show todos with status blocked | Filter by status |
+| Remove the dentist reminder | Ask for deletion confirmation |
+| Erase all my todos | Ask to confirm the selected Todo items |
 
 Todo and reminder statuses are free text, up to 100 characters. `mark`, `set`, and `update` support status requests. `done`, `complete`, `completed`, and `finished` also set the compatibility `completed` flag; other labels do not. Lists display statuses after the item, such as `karate [unsure]`. The initial `todo` status is omitted from the chat list. Use “Reopen the karate task” or set a different status to change it again.
 
@@ -131,10 +131,10 @@ The initial dependency/model download requires internet. Set `LOCAL_AI_SPEECH_MO
 
 - Ordinary questions use the model’s general knowledge, even without relevant saved memories.
 - Calendar questions receive the current local clock and the next seven dates. `LOCAL_AI_TIMEZONE` defaults to `Europe/Helsinki`.
-- Durable personal facts such as “I like pizza” are extracted, checked against the user’s source, and saved automatically. There is no Suggestions section or approval step in the normal UI.
+- Durable personal facts such as “I like pizza” are extracted, checked against the user’s source, and saved automatically in the background after a successful reply. Newly mentioned facts may take time to appear; pending extraction is cancelled at shutdown and is not replayed. There is no Suggestions section or approval step in the normal UI.
 - To explicitly save a personal fact, say **“Remember that I like pizza.”** This uses the same extraction and verification process as automatically saved facts.
 - To remove saved personal facts, name the topic: **“Forget that I like pizza”** or **“Forget my programming language preferences.”** **“Forget everything you know about me”** selects all personal facts in the General category. Review the selected records and choose **Confirm** to delete them; **Cancel** or Escape keeps them. Use `delete` or `remove` for Todo, Reminder, Link, and Document items.
-- Unsupported, secret-like, or ambiguous extracted claims are skipped. Extraction failures produce a warning while ordinary chat can continue.
+- Unsupported, secret-like, or ambiguous extracted claims are skipped. Explicit save failures produce a warning; background extraction does not send a completion or failure event after the reply stream closes.
 - Corrections and edits preserve previous records in history. The Memory library provides category, type, scope, and lifecycle-state filters, provenance, titles, task statuses, editing, and deletion.
 - Memory details below a reply identify records supplied to the response path. They do not prove that the model causally used every record. Replies omit raw memory IDs.
 - The sidebar lists the ten most recent discussions; older history remains stored. Settings → Recent conversations → **Delete recent conversations** asks for confirmation and deletes all discussions, including older ones, while keeping saved memories.
@@ -194,6 +194,16 @@ Actual-model tests are opt-in and use temporary databases:
 cd backend
 LOCAL_AI_INTEGRATION=1 ../.venv/bin/python -m pytest tests/test_ollama_integration.py -v
 ```
+
+To diagnose memory latency with actual local models, run from the project root:
+
+```sh
+.venv/bin/python scripts/benchmark_memory.py --runs 3 --size 10
+```
+
+The benchmark uses synthetic content and a disposable database; it never opens the application database. JSON output contains timings and counts, without prompts, memory text, or model responses. It separates extraction, verification, embedding calls, SQLite connection/transaction work, and remaining application work for save, index, retrieval, and answer stages. SQLite time includes Python work performed inside connection contexts. Retrieval's remaining time includes structured matching and ranking; keyword and vector queries are included in SQLite time.
+
+Run 1 includes initial indexing of the synthetic background records (`--size`); later runs generally index fewer records, so compare the `processed` counts. The first run may include model loading, but does not force a cold model or clear caches. `first_visible_chunk_ms` measures the provider's first emitted text, not Ollama's first generated token: the provider buffers output to filter thinking. The benchmark does not include HTTP, intent interpretation, background-worker contention, or browser latency. It uses environment/`.env` model settings, not settings saved in the running app. Match those settings before comparing. Failed/degraded stages set `ok=false` and make the command exit nonzero.
 
 Export model environment variables explicitly when overriding defaults; changing into `backend/` changes where a working-directory `.env` is read. See [Docker test commands](docs/docker.md) if using containers.
 

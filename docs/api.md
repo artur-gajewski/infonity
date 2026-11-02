@@ -109,7 +109,7 @@ The response is `text/event-stream`. Each event is `data: {JSON}` followed by a 
 | Event            | Fields / meaning                                                              |
 | ---------------- | ----------------------------------------------------------------------------- |
 | `conversation`   | `id`                                                                          |
-| `memory`         | `saved` IDs, legacy `suggested` count, optional `warning`                     |
+| `memory`         | `saved` IDs, legacy `suggested` count, optional `warning`; `pending=true` means automatic extraction will run after the reply, not that a save succeeded |
 | `retrieved`      | `memories` records, optional search `warning`                                 |
 | `document_draft` | Proposed `title` and `body`; open the creation dialog without saving a record |
 | `confirmation`   | Pending deletion `id` and human-readable `text`                               |

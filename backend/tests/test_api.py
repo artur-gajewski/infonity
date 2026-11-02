@@ -1,3 +1,4 @@
+import asyncio
 import json
 import pytest
 import httpx
@@ -21,6 +22,10 @@ async def client(services):
         transport=httpx.ASGITransport(app=app), base_url="http://testserver"
     ) as client:
         yield client, app, p
+        tasks = list(app.state.extraction_tasks)
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
 
 
 async def test_chat_without_memories_and_conversations(client):
@@ -235,10 +240,110 @@ async def test_chat_auto_saves_without_approval(client):
     app.state.settings.auto_save_memories = True
     p.result = {"memories": [extracted("pizza", predicate="favorite_food", evidence="I like pizza.", origin="inferred")]}
     result = events(await c.post("/api/chat", json={"message": "I like pizza."}))
-    saved = next(e for e in result if e["type"] == "memory")
-    assert len(saved["saved"]) == 1 and saved["suggested"] == 0
+    pending = next(e for e in result if e["type"] == "memory")
+    assert pending["pending"] and not pending["saved"]
+    await asyncio.gather(*list(app.state.extraction_tasks))
     assert not (await c.get("/api/memory-candidates")).json()["data"]
     assert (await c.get("/api/memories")).json()["data"][0]["value"] == "pizza"
+
+
+async def test_automatic_extraction_does_not_delay_reply(client):
+    from conftest import extracted
+    c, app, p = client
+    app.state.settings.auto_save_memories = True
+    started, release = asyncio.Event(), asyncio.Event()
+
+    async def slow_extract(prompt, messages):
+        started.set()
+        await release.wait()
+        return {"memories": [extracted("pizza", predicate="favorite_food",
+                                       evidence="I like pizza.", origin="inferred")]}
+
+    p.extract = slow_extract
+    response = await asyncio.wait_for(c.post("/api/chat", json={"message": "I like pizza."}), 2)
+    assert events(response)[-1]["type"] == "done"
+    await asyncio.wait_for(started.wait(), 2)
+    assert not app.state.memory.list()
+    release.set()
+    await asyncio.gather(*list(app.state.extraction_tasks))
+    assert app.state.memory.list()[0]["value"] == "pizza"
+
+
+async def test_deletion_during_background_extraction_prevents_resaving(client):
+    from conftest import extracted
+    c, app, p = client
+    app.state.settings.auto_save_memories = True
+    started, release = asyncio.Event(), asyncio.Event()
+
+    async def slow_extract(prompt, messages):
+        started.set()
+        await release.wait()
+        return {"memories": [extracted("pizza", predicate="favorite_food",
+                                       evidence="I like pizza.", origin="inferred")]}
+
+    p.extract = slow_extract
+    await c.post("/api/chat", json={"message": "I like pizza."})
+    await asyncio.wait_for(started.wait(), 2)
+    await c.delete("/api/conversations")
+    release.set()
+    await asyncio.gather(*list(app.state.extraction_tasks))
+    assert not app.state.memory.list()
+
+
+async def test_explicit_remember_waits_for_extraction(client):
+    from conftest import extracted
+    c, app, p = client
+    started, release = asyncio.Event(), asyncio.Event()
+
+    async def slow_extract(prompt, messages):
+        started.set()
+        await release.wait()
+        return {"memories": [extracted("pizza", predicate="favorite_food",
+                                       evidence="I like pizza.", origin="explicit")]}
+
+    p.extract = slow_extract
+    request = asyncio.create_task(c.post("/api/chat", json={"message": "Remember I like pizza."}))
+    try:
+        await asyncio.wait_for(started.wait(), 2)
+        assert not request.done()
+    finally:
+        release.set()
+    response = await asyncio.wait_for(request, 2)
+    saved = next(e for e in events(response) if e["type"] == "memory")
+    assert len(saved["saved"]) == 1
+
+
+async def test_shutdown_cancels_background_extraction(client):
+    c, app, p = client
+    started, cancelled = asyncio.Event(), asyncio.Event()
+
+    async def slow_extract(prompt, messages):
+        started.set()
+        try:
+            await asyncio.Event().wait()
+        finally:
+            cancelled.set()
+
+    p.extract = slow_extract
+    async with app.router.lifespan_context(app):
+        await c.post("/api/chat", json={"message": "I like pizza."})
+        await asyncio.wait_for(started.wait(), 2)
+    assert cancelled.is_set()
+    assert not app.state.extraction_tasks
+
+
+async def test_disabled_extraction_does_not_queue_background_work(client):
+    c, app, p = client
+    app.state.settings.extraction_enabled = False
+
+    async def unexpected_extract(*args):
+        pytest.fail("Disabled extraction must not run")
+
+    p.extract = unexpected_extract
+    result = events(await c.post("/api/chat", json={"message": "I like pizza."}))
+    assert result[-1]["type"] == "done"
+    assert not any(e.get("pending") for e in result)
+    assert not app.state.extraction_tasks
 
 
 async def test_plain_english_add_list_update_delete(client):

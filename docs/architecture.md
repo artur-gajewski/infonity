@@ -55,7 +55,24 @@ Direct category listing uses stored records rather than free-form model recall. 
 
 ## Ordinary answers and provider behavior
 
-The `chat` path extracts and verifies durable personal facts, saves supported unambiguous claims automatically, retrieves context, and generates a reply. General knowledge does not require a matching memory. The system prompt supplies the local clock and next seven calendar dates using `LOCAL_AI_TIMEZONE`.
+The ordinary `chat` path retrieves existing context and generates a reply before
+queuing automatic extraction and verification. Background extraction is serialized;
+supported unambiguous facts are saved with the usual source checks. An explicit
+`remember` request still waits for extraction and verification before replying.
+Ordinary chat no longer processes the embedding outbox before retrieval; the
+five-second worker indexes saved records. General knowledge does not require a
+matching memory. The system prompt supplies the local clock and next seven
+calendar dates using `LOCAL_AI_TIMEZONE`.
+
+Background extraction tasks are tracked in this process and cancelled at shutdown.
+They are not a durable queue or replayed after restart. Failed, interrupted, or
+cancelled replies do not queue extraction. A `memory` event with `pending=true`
+announces background work; it does not confirm a save, and no later completion
+event is sent on the closed reply stream. Newly extracted facts may not be
+available to an immediately following request. Background inference can compete
+with subsequent replies for Ollama resources. The source-exclusion checks still
+prevent deletion during extraction from restoring a fact, and a changed privacy
+epoch skips queued work before inference.
 
 The response policy prioritises the latest message and treats retrieved records as optional context. Shared words alone do not establish relevance; memory subjects, predicates, and scopes must be preserved rather than turning attributes into preferences.
 

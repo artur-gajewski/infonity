@@ -1,6 +1,6 @@
 import asyncio
 import json
-from contextlib import asynccontextmanager, suppress
+from contextlib import asynccontextmanager
 from pathlib import Path
 from urllib.parse import urlsplit
 import httpx
@@ -57,6 +57,27 @@ def create_app(settings=None, provider=None):
         memory.save_pending()
     retrieval = Retrieval(db, provider, settings)
     privacy_lock = asyncio.Lock()
+    extraction_lock = asyncio.Lock()
+    extraction_tasks = set()
+
+    async def extract_message(message_id, context):
+        try:
+            return await asyncio.wait_for(
+                memory.extract(message_id, context), timeout=settings.extraction_timeout,
+            )
+        except TimeoutError:
+            return {"saved": [], "suggested": 0,
+                    "warning": "Memory extraction timed out; ordinary chat can continue."}
+
+    def defer_extraction(message_id, context, start_epoch):
+        async def run():
+            async with extraction_lock:
+                if epoch() == start_epoch and settings.extraction_enabled:
+                    await extract_message(message_id, context)
+
+        task = asyncio.create_task(run())
+        extraction_tasks.add(task)
+        task.add_done_callback(extraction_tasks.discard)
 
     async def worker():
         while True:
@@ -66,16 +87,20 @@ def create_app(settings=None, provider=None):
     @asynccontextmanager
     async def lifespan(app):
         task = asyncio.create_task(worker())
-        yield
-        task.cancel()
-        with suppress(asyncio.CancelledError):
-            await task
+        try:
+            yield
+        finally:
+            tasks = [task, *extraction_tasks]
+            for pending in tasks:
+                pending.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
 
     app = FastAPI(title="Infonity", version="0.1.0", lifespan=lifespan)
     app.state.db = db
     app.state.memory = memory
     app.state.retrieval = retrieval
     app.state.settings = settings
+    app.state.extraction_tasks = extraction_tasks
     app.state.speech = SpeechService(settings.speech_model)
     speech_lock = asyncio.Lock()
 
@@ -495,25 +520,18 @@ def create_app(settings=None, provider=None):
                     yield event("delta", {"text": answer})
                     yield event("done", {})
                     return
-                try:
-                    extraction = await asyncio.wait_for(
-                        memory.extract(message_id, context),
-                        timeout=settings.extraction_timeout,
-                    )
-                except TimeoutError:
-                    extraction = {
-                        "saved": [],
-                        "suggested": 0,
-                        "warning": "Memory extraction timed out; ordinary chat can continue.",
-                    }
-                yield event("memory", extraction)
-                try:
-                    await asyncio.wait_for(
-                        retrieval.process_outbox(limit=8),
-                        timeout=settings.embedding_timeout,
-                    )
-                except TimeoutError:
-                    pass  # Durable outbox jobs remain pending; lexical retrieval is immediately available.
+                explicit_save = bool(fact_request and fact_request[0] == "remember")
+                if explicit_save:
+                    async with extraction_lock:
+                        extraction = await extract_message(message_id, context)
+                    yield event("memory", extraction)
+                    try:
+                        await asyncio.wait_for(
+                            retrieval.process_outbox(limit=8),
+                            timeout=settings.embedding_timeout,
+                        )
+                    except TimeoutError:
+                        pass  # Durable jobs remain pending; lexical retrieval is available.
                 found, warning = await retrieval.search(body.message)
                 if epoch() != start_epoch:
                     yield event(
@@ -563,6 +581,10 @@ def create_app(settings=None, provider=None):
                                     "INSERT INTO message_memories SELECT ?,id FROM memories WHERE id=?",
                                     (assistant_id, item["id"]),
                                 )
+                if not explicit_save and settings.extraction_enabled and epoch() == start_epoch:
+                    defer_extraction(message_id, context, start_epoch)
+                    yield event("memory", {"saved": [], "suggested": 0, "pending": True,
+                                          "warning": "Automatic memory saving continues in the background."})
                 yield event("done", {})
             except (Conflict, Missing) as exc:
                 yield event("error", {"message": str(exc)})
