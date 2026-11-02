@@ -161,6 +161,10 @@ Semantic similarity can include loosely related records alongside direct matches
 
 **Memory limit per response** caps how many relevant saved memories are included as context for one AI response. For example, a value of **8** lets Infonity search across eligible saved memories and include up to eight relevant results; it does not restrict the search to eight memories or limit how many you can store. The memory token budget can reduce how many results fit. Direct collection requests such as “Show todo” use separate listing limits.
 
+**Memory token budget**, under **Settings → Models and memory**, limits the total size of saved-memory records included with a reply. The app estimates four characters per token, so a budget of **1,200** allows roughly **4,800 characters**, including record metadata. Both limits apply: a memory limit of 8 permits up to eight records, but fewer may fit within the token budget. Neither setting limits how many memories can be stored.
+
+**Conversation history is separate:** the last **30 messages**, including yours and the assistant’s replies, are provided as context, excluding messages removed from AI context by privacy actions. Older messages remain saved in conversation history but are not automatically included. Changing the memory token budget does not change this 30-message window.
+
 ## Run natively or develop
 
 Format supported source and documentation files with `npm run format --prefix frontend`. Check formatting without changing files with `npm run format:check --prefix frontend`. Prettier does not format Python, shell scripts, or SQL.
