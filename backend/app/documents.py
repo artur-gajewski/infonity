@@ -47,14 +47,17 @@ def extract_document(filename, content):
     if len(text) > MAX_TEXT:
         raise ValueError("Extracted text exceeds 500,000 characters")
     chunks = []
-    while text:
-        end = min(CHUNK_SIZE, len(text))
+    start = 0
+    while start < len(text):
+        end = min(start + CHUNK_SIZE, len(text))
         if end < len(text):
-            boundary = text.rfind(" ", end // 2, end)
-            if boundary > 0:
+            boundary = text.rfind(" ", start + (end - start) // 2, end)
+            if boundary > start:
                 end = boundary
-        chunks.append(text[:end])
-        text = text[end:].lstrip()
+        chunks.append(text[start:end])
+        start = end
+        while start < len(text) and text[start].isspace():
+            start += 1
     return [Memory(category="documents", subject="document", predicate="content",
                    title=name if len(chunks) == 1 else f"{name} (part {i + 1}/{len(chunks)})",
                    value=chunk) for i, chunk in enumerate(chunks)]

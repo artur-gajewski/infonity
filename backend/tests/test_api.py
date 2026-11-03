@@ -938,6 +938,14 @@ async def test_upload_invalid_document(client, filename, content):
     assert not app.state.memory.list()
 
 
+async def test_upload_document_at_size_limit(client):
+    c, app, _ = client
+    content = b"Project notes".ljust(8 * 1024 * 1024, b" ")
+    response = await c.post("/api/documents/upload", params={"filename": "notes.md"}, content=content)
+    assert response.status_code == 201
+    assert app.state.memory.get(response.json()["ids"][0])["value"] == "Project notes"
+
+
 async def test_upload_atomic_secret_rejection_and_limits(client):
     c, app, _ = client
     response = await c.post("/api/documents/upload", params={"filename": "context.txt"},
@@ -946,7 +954,7 @@ async def test_upload_atomic_secret_rejection_and_limits(client):
     assert not app.state.memory.list()
     response = await c.post("/api/documents/upload", params={"filename": "huge.txt"}, content=b"x" * (8 * 1024 * 1024 + 1))
     assert response.status_code == 413
-    response = await c.post("/api/documents/upload", params={"filename": "long.txt"}, content=b"x" * 500001)
+    response = await c.post("/api/documents/upload", params={"filename": "long.txt"}, content=b"x" * 500_001)
     assert response.status_code == 422
 
 
