@@ -3,6 +3,7 @@ import re
 from typing import Protocol, AsyncIterator
 import httpx
 from .models import Extraction, Verification, Intent
+from .memory import unsupported_claim
 
 
 class ResponseText:
@@ -182,7 +183,7 @@ class Ollama:
     async def verify(self, source, claims):
         from pathlib import Path
 
-        prompt = Path(__file__).with_name("verification-v1.txt").read_text()
+        prompt = Path(__file__).with_name("verification-v2.txt").read_text()
         async with httpx.AsyncClient(timeout=120, trust_env=False) as client:
             await self.local_model(client, self.settings.model)
             content = await self.structured(
@@ -205,7 +206,13 @@ class Ollama:
             result = Verification.model_validate_json(content)
             if len(result.supported) != len(claims):
                 raise ValueError("Incomplete verification")
-            return result.supported
+            return [
+                supported and not unsupported_claim(
+                    claim.get("evidence") or source,
+                    claim.get("predicate", ""), claim.get("type", "fact"),
+                )
+                for supported, claim in zip(result.supported, claims)
+            ]
 
     async def embed(self, text):
         async with httpx.AsyncClient(timeout=120, trust_env=False) as client:

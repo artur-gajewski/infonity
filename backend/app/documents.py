@@ -28,7 +28,13 @@ def extract_document(filename, content):
             pages = []
             size = 0
             for page in reader.pages:
-                text = page.extract_text() or ""
+                # PDF drawing order can place link labels at the end of the stream,
+                # separating addresses from their instructions. Reconstruct visual
+                # reading order without padding blank vertical space.
+                text = page.extract_text(
+                    extraction_mode="layout", layout_mode_space_vertically=False,
+                    layout_mode_strip_rotated=False
+                ) or ""
                 size += len(text)
                 if size > MAX_TEXT:
                     raise ValueError()

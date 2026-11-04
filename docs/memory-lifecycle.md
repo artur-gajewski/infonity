@@ -19,6 +19,8 @@ saving, not a confirmed save. Background tasks are serialized and cancelled on
 shutdown, without replay after restart. A newly mentioned fact may therefore take
 time to appear in the library or be available to the next reply.
 
+The default extraction and verification policies are version 2. Deterministic source guards supplement model verification: questions cannot establish facts, and preference predicates require preference language in their evidence. Workplace procedures retain their organizational subject and responsibility rather than becoming user preferences; time-reporting tools must not be normalized as preferred programming languages. These guards also filter unsupported legacy personal claims during retrieval without rewriting history. Manual retraction remains available for reviewing such records.
+
 Sensitive extracted facts can be saved automatically. They remain excluded from model retrieval unless `sensitive_retrieval` is enabled in Settings. Secret detection is heuristic, not a comprehensive credential detector. Direct low-level API creation of a sensitive record still requires `confirm_sensitive=true`.
 
 Legacy candidate tables, endpoints, and configuration remain for compatibility and deterministic tests; they are not the normal UI workflow. Startup attempts to save eligible old pending candidates. Ambiguous or stale/conflicting candidates are not blindly applied. There is no automatic replay of source history.

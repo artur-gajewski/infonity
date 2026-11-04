@@ -1004,3 +1004,112 @@ async def test_misclassified_document_question_uses_answer_path_after_edit(clien
     assert "updated@example.com" in json.dumps(p.prompts[-1])
     assert "ops@example.com" not in json.dumps(p.prompts[-1])
     assert not any(e["type"] == "error" for e in result)
+
+
+async def test_document_question_sends_compact_context_with_complete_contacts(client):
+    from app.retrieval import context_json
+    c, app, provider = client
+    first = app.state.memory.create(Memory(
+        category="documents", subject="document", predicate="content",
+        title="Sick leave.pdf (part 1/2)",
+        value="When sick, notify the following stakeholders:",
+    ))
+    second = app.state.memory.create(Memory(
+        category="documents", subject="document", predicate="content",
+        title="Sick leave.pdf (part 2/2)",
+        value="Customer team leader, Key Account Manager, supervisor and People Operations. Send certificates to People Operations.",
+    ))
+    response = events(await c.post("/api/chat", json={"message": "Who should I contact if I'm sick?"}))
+    retrieved = next(e["memories"] for e in response if e["type"] == "retrieved")
+    assert {r["id"] for r in retrieved} == {first["id"], second["id"]}
+    memory_message = next(m["content"] for m in provider.prompts[-1] if m["content"].startswith("UNTRUSTED MEMORY DATA"))
+    assert memory_message.split("\n", 1)[1] == context_json(retrieved)
+    assert "Key Account Manager" in memory_message
+    assert "created_at" not in memory_message
+    history = (await c.get("/api/conversations/" + response[0]["id"])).json()["data"]
+    assert {m["id"] for m in history["messages"][-1]["memories"]} == {first["id"], second["id"]}
+
+
+async def test_contact_lookup_does_not_relabel_healthcare_or_payroll_contacts(client):
+    c, app, provider = client
+    app.state.memory.create(Memory(
+        category="documents", subject="document", predicate="content",
+        title="Workplace health.pdf (part 1/2)",
+        value="Return health assessments to People Operations or the Ops mailbox at HQ.\n"
+              "Occupational health contacts:\njane.nurse@health.example\npayroll@acme.example",
+    ))
+    response = events(await c.post("/api/chat", json={"message": "Give me contact info for people ops"}))
+    answer = "".join(e["text"] for e in response if e["type"] == "delta")
+    assert "couldn't verify" in answer
+    assert "@" not in answer
+    assert not provider.prompts  # Unsafe contact attribution never reaches free-form generation.
+
+
+async def test_contact_lookup_finds_exact_team_mailbox_despite_split_name_and_bad_history(client):
+    c, app, provider = client
+    app.state.memory.create(Memory(
+        category="documents", subject="document", predicate="content",
+        title="Workplace health.pdf (part 1/2)",
+        value="Return assessments to People Operations.\n"
+              "Healthcare staff:\njane.nurse@health.example\npayroll@acme.example",
+    ))
+    mailbox = app.state.memory.create(Memory(
+        category="documents", subject="document", predicate="content",
+        title="Workplace health.pdf (part 2/2)",
+        value="Company mailboxes:\npeopleops@acme.example\npayroll@acme.example",
+    ))
+    previous = events(await c.post("/api/chat", json={"message": "Hello"}))
+    conversation = previous[0]["id"]
+    with app.state.db.connect() as conn:
+        conn.execute("UPDATE messages SET content=? WHERE conversation_id=? AND role='assistant'",
+                     ("PeopleOps is jane.nurse@health.example and payroll@acme.example", conversation))
+    provider.prompts.clear()
+    response = events(await c.post("/api/chat", json={
+        "message": "Give me contact info for people ops", "conversation_id": conversation,
+    }))
+    answer = "".join(e["text"] for e in response if e["type"] == "delta")
+    assert "peopleops@acme.example" in answer
+    assert "jane.nurse" not in answer
+    assert "payroll@" not in answer
+    assert not provider.prompts
+    retrieved = next(e["memories"] for e in response if e["type"] == "retrieved")
+    assert mailbox["id"] in {r["id"] for r in retrieved}
+
+
+async def test_certificate_followup_retrieves_previous_named_team_and_outranks_bad_history(client):
+    c, app, provider = client
+    mailbox = app.state.memory.create(Memory(
+        category="documents", subject="document", predicate="content",
+        title="Mailboxes", value="peopleops@acme.example",
+    ))
+    app.state.memory.create(Memory(
+        category="documents", subject="document", predicate="content",
+        title="Absences", value="Send certificates to . You can also use the Ops mailbox at HQ.",
+    ))
+    response = events(await c.post("/api/chat", json={"message": "Give me contact info for people ops"}))
+    conversation = response[0]["id"]
+    with app.state.db.connect() as conn:
+        conn.execute("UPDATE messages SET content=? WHERE conversation_id=? AND role='assistant'",
+                     ("The only contact is nurse@health.example. No email submission is needed.", conversation))
+    response = events(await c.post("/api/chat", json={
+        "message": "How about my sick certificate?", "conversation_id": conversation,
+    }))
+    retrieved = next(e["memories"] for e in response if e["type"] == "retrieved")
+    assert mailbox["id"] in {r["id"] for r in retrieved}
+    prompt = provider.prompts[-1]
+    source_position = next(i for i, m in enumerate(prompt) if m['content'].startswith('UNTRUSTED MEMORY DATA'))
+    bad_history_position = next(i for i, m in enumerate(prompt) if 'nurse@health.example' in m['content'])
+    assert source_position > bad_history_position
+
+
+async def test_pdf_import_keeps_recipient_with_certificate_instruction(client):
+    from test_documents import pdf_with_late_link_text
+    c, app, provider = client
+    response = await c.post('/api/documents/upload', params={'filename': 'procedure.pdf'}, content=pdf_with_late_link_text())
+    assert response.status_code == 201
+    imported = [app.state.memory.get(ident) for ident in response.json()['ids']]
+    assert any('Send medical certificates to payroll@acme.example' in row['value'] for row in imported)
+    response = events(await c.post('/api/chat', json={'message': 'Where should I send my medical certificate?'}))
+    retrieved = next(e['memories'] for e in response if e['type'] == 'retrieved')
+    assert any('Send medical certificates to payroll@acme.example' in row['value'] for row in retrieved)
+    assert 'Send medical certificates to payroll@acme.example' in json.dumps(provider.prompts[-1])

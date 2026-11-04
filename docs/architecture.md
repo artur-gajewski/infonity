@@ -49,7 +49,15 @@ Memory triggers maintain FTS and the durable embedding outbox. Updates remove st
 
 Embeddings record the configured model, installed-model digest, dimension, and record version. Model/dimension changes invalidate or rebuild the index. Failed jobs remain queued. Keyword and structured retrieval remain available when the embedding model is missing or inference fails.
 
-Retrieval combines lexical, structured, and vector rankings with reciprocal rank fusion. Current retrieval excludes superseded, retracted, expired, future-dated, and disallowed sensitive records. Historical wording enables historical lexical/structured lookup. After retrieval and ranking, `memory_limit` (**Memory limit per response** in Settings) caps the selected context records; it does not restrict the search to that many records. A value of 8 includes up to eight relevant memories in one response. A character-based budget (`memory_tokens * 4`) can reduce that count further. Neither setting limits memory storage.
+Retrieval combines lexical, structured, and vector rankings with reciprocal rank fusion. Current retrieval excludes superseded, retracted, expired, future-dated, and disallowed sensitive records. Historical wording enables historical lexical/structured lookup. After retrieval and ranking, `memory_limit` (**Memory limit per response** in Settings) caps the selected context records; it does not restrict the search to that many records. A value of 8 includes up to eight relevant memories in one response. A character-based budget (`memory_tokens * 4`) can reduce that count further. The budget measures the compact JSON actually sent to the model, omitting storage timestamps, confidence scores and other bookkeeping; the UI and reply provenance retain the complete selected records. Neither setting limits memory storage.
+
+Retrieval removes common question words and boosts informative matches in record content. Uploaded section filenames do not independently qualify every section as a lexical/structured match. A selected document section can bring one adjacent eligible section with the same filename, scope and lifecycle state, within both existing budgets, so instructions split across boundaries remain together. Once document bodies match, unrelated sections matching only through semantic similarity are not added as filler. Semantic retrieval still supports questions phrased differently from the source.
+
+Explicit requests for a named person or team’s contact email/details use a conservative source-backed lookup instead of free-form model generation. An address must match the requested identity, be explicitly labelled with that identity, or be stored as that subject’s email. Mere proximity to a team name in a document does not establish ownership. Matching email sources are prioritized during retrieval, and missing direct evidence produces an uncertainty response.
+
+Short follow-ups beginning with “how about”, “what about” or “and” include the previous user request in retrieval, retaining a named contact target when present. Current source context follows conversation history so earlier assistant mistakes do not take precedence. The response policy treats blank extracted PDF fields as missing evidence rather than exemptions or exclusive procedures. Previously imported PDF records can retain drawing-order errors until reimported or corrected through version-preserving edits. Layout-aware extraction repairs this ordering for new imports but cannot recover text absent from a PDF’s text layer.
+
+Source guards also exclude legacy personal claims whose evidence is a question or does not express the preference claimed by their predicate. This filtering does not modify the saved record or its history.
 
 Direct category listing uses stored records rather than free-form model recall. Lists show at most 50 items. Target interpretation uses at most 100 relevant/recent item candidates and bounded previews; long content is marked truncated. Exact names, duplicate-title clarification, grounded save content, version checks, and deletion guards supplement model interpretation.
 
@@ -74,7 +82,7 @@ with subsequent replies for Ollama resources. The source-exclusion checks still
 prevent deletion during extraction from restoring a fact, and a changed privacy
 epoch skips queued work before inference.
 
-The response policy prioritises the latest message and treats retrieved records as optional context. Shared words alone do not establish relevance; memory subjects, predicates, and scopes must be preserved rather than turning attributes into preferences.
+The response policy asks for complete actionable procedures, every relevant notification role, and distinct responsibilities, without inventing primary contacts or urgency. The response policy prioritises the latest message and treats retrieved records as optional context. Shared words alone do not establish relevance; memory subjects, predicates, and scopes must be preserved rather than turning attributes into preferences.
 
 Memory JSON is user-role untrusted data, never system policy. It may inform answers but cannot grant actions. Source verification, prompt policies, and backend checks reduce model mistakes; they are not a formal guarantee of correct interpretation.
 
@@ -124,7 +132,7 @@ The API serializes transcription and runs `SpeechService` in a thread pool. fast
 
 ## Uploaded document context
 
-The raw-byte document upload endpoint extracts PDF text locally with pypdf, or
+The raw-byte document upload endpoint extracts PDF text locally with pypdf in layout mode, reconstructing visual reading order so late-drawn hyperlink labels remain beside their instructions and contact names. Blank vertical padding is suppressed and rotated text is retained. It also
 decodes UTF-8 TXT/Markdown. Bounded extraction produces sections of at most 1,600
 characters so individual sections fit typical response memory budgets. Sections
 are ordinary Documents memories with filename/part titles, saved in one transaction

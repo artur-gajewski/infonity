@@ -12,16 +12,16 @@ React and FastAPI provide the interface and API. Native Ollama interprets reques
 
 Traditional RAG retrieves information from a supplied knowledge base, often documents. Infonity also builds and maintains personal knowledge through conversations: it extracts facts, verifies them against the user's words, stores them, and preserves corrections over time.
 
-| Capability | Traditional RAG alone | Infonity |
-| --- | --- | --- |
-| Retrieve relevant information | Yes | Yes |
-| Vector embeddings and semantic search | Common | Yes, alongside keyword and structured search |
-| Build knowledge from conversations | Requires additional memory management | Automatically extracts and verifies personal facts |
-| Remember personal facts across sessions | Depends on supplied sources | Persistent SQLite memories |
-| Handle conflicting facts and corrections | Requires additional memory management | Can supersede conflicting personal claims and preserve versions |
-| Forget information | Usually by removing sources and indexes | Explicit deletion with confirmation in chat and the UI |
-| Track memory history | Depends on the source system | Version history and provenance |
-| Automatically save memories | Requires additional memory management | Supported facts are saved automatically; no suggestion approval step |
+| Capability                               | Traditional RAG alone                   | Infonity                                                             |
+| ---------------------------------------- | --------------------------------------- | -------------------------------------------------------------------- |
+| Retrieve relevant information            | Yes                                     | Yes                                                                  |
+| Vector embeddings and semantic search    | Common                                  | Yes, alongside keyword and structured search                         |
+| Build knowledge from conversations       | Requires additional memory management   | Automatically extracts and verifies personal facts                   |
+| Remember personal facts across sessions  | Depends on supplied sources             | Persistent SQLite memories                                           |
+| Handle conflicting facts and corrections | Requires additional memory management   | Can supersede conflicting personal claims and preserve versions      |
+| Forget information                       | Usually by removing sources and indexes | Explicit deletion with confirmation in chat and the UI               |
+| Track memory history                     | Depends on the source system            | Version history and provenance                                       |
+| Automatically save memories              | Requires additional memory management   | Supported facts are saved automatically; no suggestion approval step |
 
 Memory formation and memory recall are separate processes:
 
@@ -72,23 +72,23 @@ Open **http://127.0.0.1:18473**. Docker serves both the UI and API; no host Pyth
 
 The local LLM selects a structured action. The backend validates its fields and target, executes the corresponding application service, and reports the result. The model cannot call arbitrary endpoints or execute code.
 
-| Request | Result |
-| --- | --- |
-| Add todo buy groceries | Save a Todo item |
+| Request                                                 | Result                                                              |
+| ------------------------------------------------------- | ------------------------------------------------------------------- |
+| Add todo buy groceries                                  | Save a Todo item                                                    |
 | Save these notes in documents: Meeting moved to Tuesday | Open a prefilled document dialog; review and choose Create document |
-| Keep https://example.com in my links | Save a link |
-| Give that link the title Example | Change its title while preserving its URL |
-| Remind me to call the dentist on Friday | Save a reminder note |
-| Show links for my favorite foods | Filter saved links |
-| Show links containing www | Filter link content |
-| Show me links for programming | List links; conversational testing language is not a search filter |
-| Change the milk task to buy oat milk | Edit task content |
-| Mark groceries as in progress | Change task status, keeping its name |
-| Set meeting as unsure | Save the custom status `unsure` |
-| Update groceries as waiting for delivery | Save another custom status |
-| Show todos with status blocked | Filter by status |
-| Remove the dentist reminder | Ask for deletion confirmation |
-| Erase all my todos | Ask to confirm the selected Todo items |
+| Keep https://example.com in my links                    | Save a link                                                         |
+| Give that link the title Example                        | Change its title while preserving its URL                           |
+| Remind me to call the dentist on Friday                 | Save a reminder note                                                |
+| Show links for my favorite foods                        | Filter saved links                                                  |
+| Show links containing www                               | Filter link content                                                 |
+| Show me links for programming                           | List links; conversational testing language is not a search filter  |
+| Change the milk task to buy oat milk                    | Edit task content                                                   |
+| Mark groceries as in progress                           | Change task status, keeping its name                                |
+| Set meeting as unsure                                   | Save the custom status `unsure`                                     |
+| Update groceries as waiting for delivery                | Save another custom status                                          |
+| Show todos with status blocked                          | Filter by status                                                    |
+| Remove the dentist reminder                             | Ask for deletion confirmation                                       |
+| Erase all my todos                                      | Ask to confirm the selected Todo items                              |
 
 Todo and reminder statuses are free text, up to 100 characters. `mark`, `set`, and `update` support status requests. `done`, `complete`, `completed`, and `finished` also set the compatibility `completed` flag; other labels do not. Lists display statuses after the item, such as `karate [unsure]`. The initial `todo` status is omitted from the chat list. Use “Reopen the karate task” or set a different status to change it again.
 
@@ -98,7 +98,11 @@ Deletion requests show the selected items before execution. **Confirm** deletes 
 
 Choose **Create document** in the sidebar, or request document creation in chat, to open a dialog with separate Title and Body fields. Review the draft and choose **Create document** to save; Cancel or Escape discards the unsaved draft. The creation dialog requires both fields. Document titles in chat lists and the library open the full stored body; **Edit memory** opens the version-preserving editor. The API and editor also support a titled document with an empty body. Saved URLs are clickable in chat and the library.
 
-Reminders are stored notes with their date/time text. **Scheduled notifications are not implemented.** Use **Upload file** below **Create document** and above **Settings** in the sidebar to save PDF, TXT, and Markdown (`.md`) contents into document memories. Files are processed locally into searchable sections labeled with the filename. Ask about their contents in a later conversation; keyword retrieval is immediate and semantic vector indexing runs in the background using Ollama. The library shows each section under Documents, where it can be viewed, edited, or deleted. Limits: 8 MiB per file, 500,000 extracted characters, and 500 PDF pages. TXT/Markdown must be UTF-8; PDFs must be unencrypted and contain embedded text (scanned PDFs need OCR first). Original file bytes are not retained. Existing secret-content validation applies to uploads; a rejected section rolls back the entire upload. The single-line message input remains visible while the conversation scrolls; multiline content can be edited in the library or supplied through the API/JSON import.
+Reminders are stored notes with their date/time text. **Scheduled notifications are not implemented.** Use **Upload file** below **Create document** and above **Settings** in the sidebar to save PDF, TXT, and Markdown (`.md`) contents into document memories. Files are processed locally into searchable sections labeled with the filename. PDF extraction follows visual layout so linked email addresses stay with their instructions instead of moving to the end of the page. Ask about their contents in a later conversation; keyword retrieval is immediate and semantic vector indexing runs in the background using Ollama. The library shows each section under Documents, where it can be viewed, edited, or deleted. Limits: 8 MiB per file, 500,000 extracted characters, and 500 PDF pages. TXT/Markdown must be UTF-8; PDFs must be unencrypted and contain embedded text (scanned PDFs need OCR first). Original file bytes are not retained. Existing secret-content validation applies to uploads; a rejected section rolls back the entire upload. The single-line message input remains visible while the conversation scrolls; multiline content can be edited in the library or supplied through the API/JSON import.
+
+**Older PDF imports:** Updating the app does not re-extract documents already stored in the database. If an older import separated addresses from instructions or mixed the reading order, remove all sections belonging to the affected PDFs in the Memory library, then upload the original files again. Re-uploading alone can leave duplicate sections. You do not need to delete unrelated memories. Start a new conversation after re-importing so earlier incorrect replies are not reused as conversation context. Infonity never modifies the original PDF files.
+
+The improved extraction restores source relationships; it does not guarantee that the model will interpret every procedure correctly. Check important instructions against the source. Previously extracted incorrect facts may also need separate review or retraction.
 
 ## Conversations and personal memory
 
@@ -163,7 +167,11 @@ Semantic similarity can include loosely related records alongside direct matches
 
 **Memory limit per response** caps how many relevant saved memories are included as context for one AI response. For example, a value of **8** lets Infonity search across eligible saved memories and include up to eight relevant results; it does not restrict the search to eight memories or limit how many you can store. The memory token budget can reduce how many results fit. Direct collection requests such as “Show todo” use separate listing limits.
 
-**Memory token budget**, under **Settings → Models and memory**, limits the total size of saved-memory records included with a reply. The app estimates four characters per token, so a budget of **1,200** allows roughly **4,800 characters**, including record metadata. Both limits apply: a memory limit of 8 permits up to eight records, but fewer may fit within the token budget. Neither setting limits how many memories can be stored.
+**Memory token budget**, under **Settings → Models and memory**, limits the total size of saved-memory records included with a reply. The app estimates four characters per token, so a budget of **1,200** allows roughly **4,800 characters**, including record metadata. Both limits apply: a memory limit of 8 permits up to eight records, but fewer may fit within the token budget. The budget counts compact context JSON rather than complete database records. Matching document sections can include an adjacent section to preserve instructions across section boundaries, within both limits. Neither setting limits how many memories can be stored.
+
+Document retrieval prioritizes matches in section content over repeated filenames and can keep an adjacent section with its matching section. Short “how about”, “what about”, and “and” follow-ups also use the preceding user request to retain context. Explicit requests for a named contact’s email use source-backed address matching rather than assigning every nearby address to that person or team; an unverified address produces an uncertainty response.
+
+Automatic extraction and verification reject question-based facts and preference labels unsupported by their evidence. Organizational procedures should remain organizational facts, rather than personal preferences. These checks also exclude unsupported legacy personal claims from reply context without deleting their history.
 
 **Conversation history is separate:** the last **30 messages**, including yours and the assistant’s replies, are provided as context, excluding messages removed from AI context by privacy actions. Older messages remain saved in conversation history but are not automatically included. Changing the memory token budget does not change this 30-message window.
 
@@ -191,6 +199,8 @@ Copy/edit `.env.example` for native settings. Saved model/retrieval Settings tak
 ## Verification
 
 GitHub Actions runs storage, backend, and frontend tests plus the production frontend build on every push and pull request. Actual-model Ollama tests remain opt-in and are skipped in CI. The badge above shows the latest test workflow result on `main`.
+
+Backend verification on **2026-11-04**: **250 deterministic tests passed** for the PDF layout, retrieval, source-checking, and contact lookup changes. Selected local-Ollama regressions and manual checks using the supplied PDFs were also run with disposable databases; these do not establish accuracy for every generated answer. Frontend source was unchanged in this update.
 
 Latest frontend verification on **2026-10-30**: **66 tests across 7 files passed**, and the TypeScript/Vite production build passed after the component refactor. Earlier backend, storage, and selected real-Ollama results are recorded separately in [verification details](docs/verification.md); those checks were not rerun for the frontend refactor. No real-browser visual audit was run.
 

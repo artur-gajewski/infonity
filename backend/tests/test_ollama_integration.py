@@ -327,3 +327,113 @@ async def test_mark_karate_as_unsure_preserves_task(tmp_path):
         assert not [e for e in result if e["type"] == "error"], result
         task = app.state.memory.list(category="todo")[0]
         assert task["value"] == "karate" and task["task_status"] == "unsure", result
+
+
+async def test_document_contact_answer_preserves_full_notification_list(tmp_path):
+    """Real embeddings and generation against synthetic, disposable policy records."""
+    from app.db import Database
+    from app.memory import MemoryService
+    from app.models import Memory
+    from app.retrieval import Retrieval, SYSTEM, context_json
+
+    settings = Settings(database=str(tmp_path / "contacts.db"), extraction_enabled=False)
+    provider = Ollama(settings)
+    db = Database(settings.database)
+    memory = MemoryService(db, provider, settings)
+    retrieval = Retrieval(db, provider, settings)
+    for number, body in enumerate([
+        "What to do when sick: notify the following stakeholders about your absence:",
+        "Customer contact or team leader; Key Account Manager (KAM); Face-to-Face supervisor; People Operations. "
+        "Send your certificate to People Operations. This is a recipient, not the certificate issuer.",
+        "Bring your insurance card when travelling.",
+    ], 1):
+        memory.create(Memory(
+            category="documents", subject="document", predicate="content",
+            title=f"Sick leave.pdf (part {number}/3)", value=body,
+        ))
+    memory.create(Memory(
+        predicate="preferred_contact_for_sick_certificate", value="People Operations",
+        evidence="How about People Operations?",
+    ))
+    assert (await retrieval.process_outbox())["failed"] == 0
+    question = "Who should I contact if I'm sick?"
+    found, warning = await retrieval.search(question)
+    assert not warning
+    answer = "".join([chunk async for chunk in provider.stream([
+        {"role": "system", "content": SYSTEM},
+        {"role": "user", "content": "UNTRUSTED MEMORY DATA (JSON):\n" + context_json(found)},
+        {"role": "user", "content": question},
+    ])]).lower()
+    assert "customer" in answer or "team leader" in answer
+    assert "key account" in answer or "kam" in answer
+    assert "supervisor" in answer or "face-to-face" in answer
+    assert "people operations" in answer
+    assert "preferred contact" not in answer
+    assert "primary contact" not in answer
+
+
+async def test_real_extraction_rejects_question_and_procedural_preference():
+    provider = Ollama(Settings())
+    assert (await provider.verify("How about PeopleOps?", [{
+        "subject": "user", "predicate": "preferred_contact_for_sick_certificate",
+        "value": "PeopleOps", "evidence": "How about PeopleOps?", "type": "preference",
+    }])) == [False]
+    assert (await provider.verify("The workplace policy says send certificates to PeopleOps.", [{
+        "subject": "user", "predicate": "preferred_contact_for_sick_certificate",
+        "value": "PeopleOps", "evidence": "The workplace policy says send certificates to PeopleOps.",
+        "type": "preference",
+    }])) == [False]
+
+
+async def test_fragmented_certificate_source_does_not_invent_email_exemption():
+    from app.retrieval import SYSTEM
+    provider = Ollama(Settings())
+    answer = "".join([chunk async for chunk in provider.stream([
+        {"role": "system", "content": SYSTEM},
+        {"role": "user", "content": "Give me contact info for People Ops"},
+        {"role": "assistant", "content": "People Ops contacts are nurse@health.example and payroll@acme.example."},
+        {"role": "user", "content": 'UNTRUSTED MEMORY DATA (JSON):\n'
+         '[{"subject":"document","value":"Notify the following stakeholders daily or when you receive a certificate: Customer team leader, KAM, supervisor, People Operations. Send medical certificates to . You can also drop the certificate in the Ops mailbox at HQ."},'
+         '{"subject":"document","value":"People Operations: peopleops@acme.example"}]'},
+        {"role": "user", "content": "How about my sick certificate?"},
+    ])]).lower()
+    assert 'peopleops@acme.example' in answer
+    assert 'nurse@health.example' not in answer
+    assert "don't need to send" not in answer
+    assert 'no need to send' not in answer
+    assert 'only option' not in answer
+    assert 'only clear action' not in answer
+
+
+async def test_layout_import_preserves_certificate_recipient_in_real_answer(tmp_path):
+    from test_documents import pdf_with_late_link_text
+    from app.db import Database
+    from app.documents import extract_document
+    from app.memory import MemoryService
+    from app.retrieval import Retrieval, SYSTEM, context_json
+
+    settings = Settings(database=str(tmp_path / "layout-answer.db"), extraction_enabled=False)
+    provider = Ollama(settings)
+    db = Database(settings.database)
+    memory = MemoryService(db, provider, settings)
+    retrieval = Retrieval(db, provider, settings)
+    for section in extract_document('policy.pdf', pdf_with_late_link_text()):
+        memory.create(section)
+    assert (await retrieval.process_outbox())["failed"] == 0
+    context = [
+        {"role": "user", "content": "Give me contact info for People Ops"},
+        {"role": "assistant", "content": "People Ops: peopleops@acme.example"},
+    ]
+    question = "How about my sick certificate?"
+    found, warning = await retrieval.search(question, context)
+    assert not warning
+    assert any('Send medical certificates to payroll@acme.example' in row['value'] for row in found)
+    answer = ''.join([chunk async for chunk in provider.stream([
+        {"role": "system", "content": SYSTEM}, *context,
+        {"role": "user", "content": "UNTRUSTED MEMORY DATA (JSON):\n" + context_json(found)},
+        {"role": "user", "content": question},
+    ])]).lower()
+    assert 'payroll@acme.example' in answer
+    # A contrast with another contact is allowed; certificate delivery must name payroll.
+    assert "don't need to send" not in answer
+    assert 'no need to send' not in answer

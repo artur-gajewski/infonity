@@ -42,6 +42,25 @@ def secret(text):
     )
 
 
+def unsupported_claim(evidence, predicate, kind):
+    """Conservative source guards, independent of model verification."""
+    evidence = evidence.strip()
+    # Check the evidence span, not the whole message: an assertion followed by
+    # a separate question can still establish a supported fact.
+    if evidence.endswith("?") or re.match(
+        r"(?i)^(?:(?:how|what)\s+about|(?:who|where|when|why|how|what)\s+"
+        r"(?:should|can|could|would|do|does|did|is|are))\b", evidence,
+    ):
+        return True
+    predicate_words = terms(predicate)
+    if kind == "preference" or predicate_words & {
+        "preferred", "favorite", "favourite", "likes", "enjoys", "prefers",
+    }:
+        if not re.search(r"(?i)\b(?:prefer\w*|favou?rite|like|likes|love|loves|enjoy\w*|rather)\b", evidence):
+            return True
+    return False
+
+
 def contextual_records(db, memory):
     """Same contextual key, with overlapping validity intervals.
 
@@ -336,7 +355,7 @@ class MemoryService:
                 if not fresh or fresh["excluded"]:
                     return {"saved": [], "suggested": 0, "warning": None}
                 for item, grounded in zip(output.memories, supported):
-                    if grounded is not True:
+                    if grounded is not True or unsupported_claim(item.evidence, item.predicate, item.type):
                         continue
                     # Exact source span and value grounding; never accept unsupported model assertions.
                     if (

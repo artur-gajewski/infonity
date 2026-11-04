@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     sensitive_retrieval: bool = False
     extraction_timeout: float = Field(90, ge=1, le=600)
     embedding_timeout: float = Field(15, ge=1, le=120)
-    extraction_prompt: str = str(Path(__file__).with_name("extraction-v1.txt"))
+    extraction_prompt: str = str(Path(__file__).with_name("extraction-v2.txt"))
 
     @field_validator("timezone")
     @classmethod
